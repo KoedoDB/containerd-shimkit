@@ -38,6 +38,9 @@ impl TaskState {
     pub fn delete(&mut self) -> Result<()> {
         *self = match self {
             Self::Created | Self::Exited => Ok(Self::Deleting),
+            // Allow idempotent delete — containerd may retry delete after a
+            // TaskExit event races with an explicit delete call.
+            Self::Deleting => Ok(Self::Deleting),
             _ => state_transition_error(*self, Self::Deleting),
         }?;
         Ok(())
@@ -108,6 +111,16 @@ mod tests {
         // This is the critical path: kill after exit must not fail
         s.kill().unwrap();
         assert!(matches!(s, TaskState::Exited));
+        s.delete().unwrap();
+        assert!(matches!(s, TaskState::Deleting));
+    }
+
+    #[test]
+    fn delete_is_idempotent() {
+        let mut s = TaskState::Exited;
+        s.delete().unwrap();
+        assert!(matches!(s, TaskState::Deleting));
+        // Retry delete while already deleting must not fail
         s.delete().unwrap();
         assert!(matches!(s, TaskState::Deleting));
     }
