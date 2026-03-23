@@ -1,12 +1,25 @@
 use anyhow::Result;
-use containerd_shim::cgroup::collect_metrics;
-use containerd_shim::util::convert_to_any;
 use protobuf::well_known_types::any::Any;
 
 #[cfg_attr(feature = "tracing", tracing::instrument(level = "Debug"))]
-pub fn get_metrics(pid: u32) -> Result<Any> {
-    let metrics = collect_metrics(pid)?;
+pub fn get_metrics(_pid: u32) -> Result<Any> {
+    // The shim delegates VM lifecycle to the sandbox daemon. The PID returned
+    // from start() is the in-guest container PID, not a host process we can
+    // collect cgroup metrics for. Return empty metrics to avoid:
+    // 1. "read cgroup error: No such file or directory" (PID not in a cgroup)
+    // 2. "can't unmarshal v1.Metrics to v2.Metrics" (wrong protobuf type on v2 systems)
+    //
+    // Real resource accounting is done by placing the CH process in the
+    // pod's sandbox cgroup — kubelet tracks that cgroup directly.
+    let mut any = Any::new();
 
-    let metrics = convert_to_any(Box::new(metrics))?;
-    Ok(metrics)
+    // Detect cgroup version and return the correct empty type
+    if std::path::Path::new("/sys/fs/cgroup/cgroup.controllers").exists() {
+        any.type_url = "io.containerd.cgroups.v2.Metrics".to_string();
+    } else {
+        any.type_url = "io.containerd.cgroups.v1.Metrics".to_string();
+    }
+    any.value = Vec::new();
+
+    Ok(any)
 }
