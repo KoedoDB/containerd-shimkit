@@ -43,7 +43,7 @@ pub enum Error {
     #[error("{0}")]
     Errno(#[from] nix::errno::Errno),
     /// Errors from libcontainer
-    #[cfg(unix)]
+    #[cfg(all(unix, feature = "libcontainer"))]
     #[error("{0}")]
     Libcontainer(#[source] Box<libcontainer::error::LibcontainerError>),
     #[error("{0}")]
@@ -52,7 +52,7 @@ pub enum Error {
 
 pub type Result<T, E = Error> = ::std::result::Result<T, E>;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "libcontainer"))]
 impl From<libcontainer::error::LibcontainerError> for Error {
     fn from(err: libcontainer::error::LibcontainerError) -> Self {
         Self::Libcontainer(Box::new(err))

@@ -65,13 +65,13 @@ time = { version = "0.3.47", features = ["serde", "std", "formatting"] }
 zygote = { version =  "0.1.2" }
 caps = "0.5"
 # this must match the version pulled by libcontainer
-dbus = { version = "0", features = ["vendored"] }
+dbus = { version = "0", features = ["vendored"], optional = true }
 libcontainer = { workspace = true, features = [
     "libseccomp",
     "systemd",
     "v1",
     "v2",
-] }
+], optional = true }
 nix = { workspace = true, features = ["sched", "mount"] }
 containerd-client = "0.8.0"
 
@@ -95,6 +95,8 @@ rand = "0.10"
 temp-env = "0.3"
 
 [features]
+default = ["libcontainer"]
+libcontainer = ["dep:libcontainer", "dep:dbus"]
 opentelemetry = [
     "tracing",
     "dep:opentelemetry",
