@@ -38,26 +38,11 @@ pub enum Error {
     /// Error while parsing JSON
     #[error("{0}")]
     Json(#[from] serde_json::Error),
-    /// Error from the system
-    #[cfg(unix)]
-    #[error("{0}")]
-    Errno(#[from] nix::errno::Errno),
-    /// Errors from libcontainer
-    #[cfg(all(unix, feature = "libcontainer"))]
-    #[error("{0}")]
-    Libcontainer(#[source] Box<libcontainer::error::LibcontainerError>),
     #[error("{0}")]
     Containerd(String),
 }
 
 pub type Result<T, E = Error> = ::std::result::Result<T, E>;
-
-#[cfg(all(unix, feature = "libcontainer"))]
-impl From<libcontainer::error::LibcontainerError> for Error {
-    fn from(err: libcontainer::error::LibcontainerError) -> Self {
-        Self::Libcontainer(Box::new(err))
-    }
-}
 
 impl From<Error> for ttrpc::Error {
     fn from(e: Error) -> Self {

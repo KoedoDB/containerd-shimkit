@@ -59,11 +59,7 @@ pub mod shim;
 pub mod sync;
 
 pub use error::{Error, Result};
-pub use instance::{Instance, InstanceConfig};
-pub use shim::Config;
+pub use instance::{ExecConfig, Instance, InstanceConfig};
 pub(crate) use shim::Shim;
-
-pub(crate) mod instance_utils;
-pub(crate) mod oci;
 
 pub(crate) mod async_utils;

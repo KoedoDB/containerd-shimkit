@@ -1,111 +1,33 @@
+# containerd-shimkit, cut down and extended for a shim whose containers run in a VM: see KOEDODB.md. A start from containerd/runwasi
+# (Apache-2.0). The dependency versions are those of the upstream workspace at 5a8fc8e9, written out because this is a crate of its own.
 [package]
 name = "containerd-shimkit"
-description = "Opinionated library for building containerd shims"
+description = "A small library for building containerd shims whose containers run elsewhere"
 version = "0.1.2"
-edition.workspace = true
-license.workspace = true
+edition = "2024"
+license = "Apache-2.0"
 readme = "README.md"
-homepage.workspace = true
-repository.workspace = true
+homepage = "https://github.com/KoedoDB/containerd-shimkit"
+repository = "https://github.com/KoedoDB/containerd-shimkit"
+publish = false
 
 [lib]
 doctest = false
 
 [dependencies]
-anyhow = { workspace = true }
-chrono = { workspace = true }
-containerd-shim = { workspace = true }
-git-version = { version = "0.3.9" }
-log = { workspace = true }
-oci-spec = { workspace = true }
-protobuf = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-tempfile = { workspace = true, optional = true }
-thiserror = { workspace = true }
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time"] }
-futures = { version = "0.3.32" }
-serde_bytes = "0.11"
-prost = "0.13"
-toml = "0.8"
+anyhow = "1.0"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+containerd-shim = "0.11"
+futures = { version = "0.3.32", default-features = false, features = ["std"] }
+log = "0.4"
+oci-spec = { version = "0.9.0", default-features = false, features = ["runtime"] }
+protobuf = "3.7"
+serde_json = "1.0"
+thiserror = "2.0"
+tokio = { version = "1.52.3", default-features = false, features = ["rt-multi-thread", "macros", "sync", "time"] }
 trait-variant = "0.1"
-tokio-async-drop = "0.1"
-
-# tracing
-# note: it's important to keep the version of tracing in sync with tracing-subscriber
-tracing = { workspace = true, optional = true }
-# does not include `tracing-log` feature due to https://github.com/spinkube/containerd-shim-spin/issues/61
-tracing-subscriber = { version = "0.3", default-features = false, features = [
-    "smallvec", # Enables performance optimizations
-    "fmt",
-    "ansi",
-    "std",
-    "env-filter",
-    "json",
-    "registry",
-], optional = true }
-
-# opentelemetry
-opentelemetry = { version = "0.23", features = ["trace"], optional = true, default-features = false}
-opentelemetry-otlp = { version = "0.16.0", default-features = false, features = [
-    "grpc-tonic",
-    "http-proto",
-    "reqwest-client",
-    "trace",
-], optional = true }
-opentelemetry_sdk = { version = "0.23", default-features = false, features = [
-    "rt-tokio",
-], optional = true }
-tracing-opentelemetry = { version = "0.24", optional = true }
-
-# vendored code
-time = { version = "0.3.47", features = ["serde", "std", "formatting"] }
-
-[target.'cfg(unix)'.dependencies]
-zygote = { version =  "0.1.2" }
-caps = "0.5"
-# this must match the version pulled by libcontainer
-dbus = { version = "0", features = ["vendored"], optional = true }
-libcontainer = { workspace = true, features = [
-    "libseccomp",
-    "systemd",
-    "v1",
-    "v2",
-], optional = true }
-nix = { workspace = true, features = ["sched", "mount"] }
-containerd-client = "0.8.0"
-
-[target.'cfg(windows)'.dependencies]
-windows-sys = { workspace = true, features = [
-    "Win32_Foundation",
-    "Win32_Storage_FileSystem",
-] }
-# vendored code
-mio = { version = "1.2", features = ["os-ext", "os-poll"] }
-
-[build-dependencies]
-ttrpc-codegen = { version = "0.4.2" }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["signal"] }
-containerd-shim-wasm-test-modules = { workspace = true }
-tempfile = { workspace = true }
-oci-tar-builder = { workspace = true }
-rand = "0.10"
-temp-env = "0.3"
-
-[features]
-default = ["libcontainer"]
-libcontainer = ["dep:libcontainer", "dep:dbus"]
-opentelemetry = [
-    "tracing",
-    "dep:opentelemetry",
-    "dep:opentelemetry-otlp",
-    "dep:opentelemetry_sdk",
-    "dep:tracing-opentelemetry",
-]
-tracing = ["dep:tracing", "dep:tracing-subscriber"]
-
-[package.metadata.cargo-machete]
-# used as part of a derive macro
-ignored = ["serde_bytes"]
+tempfile = "3.27"
+tokio = { version = "1.52.3", default-features = false, features = ["rt-multi-thread", "macros", "sync", "time", "signal"] }
+tokio-async-drop = "0.1"

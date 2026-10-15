@@ -46,7 +46,6 @@ where
 {
     type T = Local<I>;
 
-    #[cfg_attr(feature = "tracing", tracing::instrument(level = "Info"))]
     fn new(_runtime_id: &str, args: &Flags, _config: &mut shim::Config) -> Self {
         Shim {
             namespace: args.namespace.to_string(),
@@ -57,7 +56,6 @@ where
         }
     }
 
-    #[cfg_attr(feature = "tracing", tracing::instrument(level = "Info"))]
     fn start_shim(&mut self, opts: containerd_shim::StartOpts) -> shim::Result<String> {
         let dir = current_dir().map_err(|err| ShimError::Other(err.to_string()))?;
         let spec = Spec::load(dir.join("config.json")).map_err(|err| {
@@ -78,22 +76,16 @@ where
         Ok(address)
     }
 
-    #[cfg_attr(feature = "tracing", tracing::instrument(level = "Info"))]
     fn wait(&mut self) {
         self.exit.wait().block_on();
     }
 
-    #[cfg_attr(
-        feature = "tracing",
-        tracing::instrument(skip(publisher), level = "Info")
-    )]
     fn create_task_service(&self, publisher: RemotePublisher) -> Self::T {
         let events = RemoteEventSender::new(&self.namespace, publisher);
         let exit = self.exit.clone();
         Local::<I>::new(events, exit, &self.namespace, &self.containerd_address)
     }
 
-    #[cfg_attr(feature = "tracing", tracing::instrument(level = "Info"))]
     fn delete_shim(&mut self) -> shim::Result<api::DeleteResponse> {
         Ok(api::DeleteResponse {
             exit_status: 137,

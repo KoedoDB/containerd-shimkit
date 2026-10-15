@@ -1,5 +1,3 @@
-#![cfg_attr(windows, allow(dead_code))] // this is currently used only for linux
-
 use std::future::Future;
 use std::sync::LazyLock;
 use std::time::Duration;
