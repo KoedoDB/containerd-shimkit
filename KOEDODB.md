@@ -46,6 +46,12 @@ dependencies: 22 → 11 (+3 for tests). Crates in the shim's dependency tree: 18
 depends unconditionally on `zbus` (D-Bus), about 35 crates this shim never uses. That can only go by patching `containerd-shim`
 (see below).
 
+## Changes after 0.1.2-koedodb.1
+
+- **0.1.2-koedodb.2**: `start` no longer spins for ever when the child it started is reaped at the wrong moment (it ignores SIGPIPE before it
+  ends; see the commit message for the trace: seen about once in twenty pod starts, none in 150 consecutive starts afterwards), and an
+  instance can name the pid of the task (`Instance::pid_hint`), which a shim that runs under Docker needs.
+
 ## Updating
 
 To take a newer upstream version: copy `crates/containerd-shimkit` of the new tag over a branch, then redo the removals above and re-apply the

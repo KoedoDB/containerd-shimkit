@@ -3,7 +3,7 @@
 [package]
 name = "containerd-shimkit"
 description = "A small library for building containerd shims whose containers run elsewhere"
-version = "0.1.2-koedodb.1"
+version = "0.1.2-koedodb.2"
 edition = "2024"
 license = "Apache-2.0"
 readme = "README.md"
