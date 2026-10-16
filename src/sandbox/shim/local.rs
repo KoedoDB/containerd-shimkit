@@ -327,7 +327,7 @@ impl<T: Instance + Send + Sync, E: EventSender> Local<T, E> {
             stdin: i.config.stdin.to_string_lossy().to_string(),
             stdout: i.config.stdout.to_string_lossy().to_string(),
             stderr: i.config.stderr.to_string_lossy().to_string(),
-            pid: pid.unwrap_or_default(),
+            pid: i.reported_pid(),
             exit_status: exit_code.unwrap_or_default(),
             exited_at: timestamp.into(),
             status: status.into(),
@@ -511,7 +511,7 @@ impl<T: Instance + Sync + Send, E: EventSender> Task for Local<T, E> {
 
         let i = self.get_instance(req.id()).block_on()?;
         let shim_pid = std::process::id();
-        let task_pid = i.pid().unwrap_or_default();
+        let task_pid = i.reported_pid();
         Ok(ConnectResponse {
             shim_pid,
             task_pid,

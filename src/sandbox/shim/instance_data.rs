@@ -39,6 +39,12 @@ impl<T: Instance> InstanceData<T> {
         self.pid.get().copied()
     }
 
+    /// The pid to show a client: the task's own once it runs, else the instance's hint (see `Instance::pid_hint`), else 0. Whether the task
+    /// runs is told by `pid()`, never by this.
+    pub fn reported_pid(&self) -> u32 {
+        self.pid().or_else(|| self.instance.pid_hint()).unwrap_or_default()
+    }
+
     pub async fn start(&self) -> Result<u32> {
         let mut s = self.state.write().await;
         s.start()?;
@@ -212,5 +218,73 @@ impl<T: Instance> InstanceData<T> {
             return Ok(());
         }
         self.instance.exec_close_stdin(&exec.config.exec_id).await
+    }
+}
+
+#[cfg(test)]
+mod pid_hint_tests {
+    use chrono::{DateTime, Utc};
+
+    use super::*;
+    use crate::sandbox::instance::{Instance, InstanceConfig};
+    use crate::sandbox::sync::WaitableCell;
+
+    /// An instance with a process from `Create` on (what Docker needs: it takes `/proc/<pid>/ns/net` of the task's pid before `Start`).
+    struct Hinted(WaitableCell<(u32, DateTime<Utc>)>);
+
+    impl Instance for Hinted {
+        async fn new(_id: String, _cfg: &InstanceConfig) -> Result<Self, Error> {
+            Ok(Hinted(WaitableCell::new()))
+        }
+        fn pid_hint(&self) -> Option<u32> {
+            Some(4242)
+        }
+        async fn start(&self) -> Result<u32, Error> {
+            Ok(77)
+        }
+        async fn kill(&self, _signal: u32) -> Result<(), Error> {
+            let _ = self.0.set((0, Utc::now()));
+            Ok(())
+        }
+        async fn delete(&self) -> Result<(), Error> {
+            Ok(())
+        }
+        async fn wait(&self) -> (u32, DateTime<Utc>) {
+            *self.0.wait().await
+        }
+    }
+
+    #[tokio::test]
+    async fn the_hint_is_shown_before_start_and_does_not_make_the_task_run() {
+        let data = InstanceData::<Hinted>::new("t", InstanceConfig::default()).await.unwrap();
+        assert_eq!(data.reported_pid(), 4242, "shown after Create");
+        assert_eq!(data.pid(), None, "but the task does not run yet: exec needs a running task");
+        data.start().await.unwrap();
+        assert_eq!(data.pid(), Some(77));
+        assert_eq!(data.reported_pid(), 77, "the task's own pid once it runs");
+    }
+
+    #[tokio::test]
+    async fn without_a_hint_the_pid_is_zero_until_start() {
+        struct Plain(WaitableCell<(u32, DateTime<Utc>)>);
+        impl Instance for Plain {
+            async fn new(_id: String, _cfg: &InstanceConfig) -> Result<Self, Error> {
+                Ok(Plain(WaitableCell::new()))
+            }
+            async fn start(&self) -> Result<u32, Error> {
+                Ok(9)
+            }
+            async fn kill(&self, _signal: u32) -> Result<(), Error> {
+                Ok(())
+            }
+            async fn delete(&self) -> Result<(), Error> {
+                Ok(())
+            }
+            async fn wait(&self) -> (u32, DateTime<Utc>) {
+                *self.0.wait().await
+            }
+        }
+        let data = InstanceData::<Plain>::new("t", InstanceConfig::default()).await.unwrap();
+        assert_eq!(data.reported_pid(), 0);
     }
 }

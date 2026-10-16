@@ -57,6 +57,13 @@ pub trait Instance: 'static {
     where
         Self: Sized;
 
+    /// A process that exists from `Create` on, which the client may be shown as the task's pid before `Start`. Docker needs one: it takes
+    /// `/proc/<pid>/ns/net` of the task's pid right after `Create` (when the spec asks the runtime to make a network namespace) and
+    /// sets the network up in it before it starts the task. Default: none (the pid is 0 until `Start`).
+    fn pid_hint(&self) -> Option<u32> {
+        None
+    }
+
     /// Start the instance
     /// The returned value should be a unique ID (such as a PID) for the instance.
     /// Nothing internally should be using this ID, but it is returned to containerd where a user may want to use it.
