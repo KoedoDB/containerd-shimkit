@@ -73,6 +73,15 @@ where
 
         write_address(&address)?;
 
+        // `containerd_shim::run` has set up handlers for SIGPIPE and SIGCHLD that write to a pipe which only the server end reads. In this `start`
+        // process the reading end is closed when `run` returns, a moment before the process ends. If the child we just started (a second shim for
+        // a pod that has one already exits at once) is reaped in that moment, the handler writes to the closed pipe, gets EPIPE, which raises
+        // SIGPIPE, which runs the same handler: for ever (the process spins until containerd kills it, minutes later; seen about once in twenty
+        // pod starts). Ignoring SIGPIPE, what Rust itself does at start-up, makes the EPIPE an ordinary error.
+        unsafe {
+            libc::signal(libc::SIGPIPE, libc::SIG_IGN);
+        }
+
         Ok(address)
     }
 

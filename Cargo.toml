@@ -19,6 +19,7 @@ anyhow = "1.0"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 containerd-shim = "0.11"
 futures = { version = "0.3.34", default-features = false, features = ["std"] }
+libc = "0.2"
 log = "0.4"
 oci-spec = { version = "0.9.0", default-features = false, features = ["runtime"] }
 protobuf = "3.7"
