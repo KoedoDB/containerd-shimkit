@@ -3,7 +3,7 @@
 [package]
 name = "containerd-shimkit"
 description = "A small library for building containerd shims whose containers run elsewhere"
-version = "0.1.2"
+version = "0.1.2-koedodb.1"
 edition = "2024"
 license = "Apache-2.0"
 readme = "README.md"
@@ -18,16 +18,16 @@ doctest = false
 anyhow = "1.0"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 containerd-shim = "0.11"
-futures = { version = "0.3.32", default-features = false, features = ["std"] }
+futures = { version = "0.3.34", default-features = false, features = ["std"] }
 log = "0.4"
 oci-spec = { version = "0.9.0", default-features = false, features = ["runtime"] }
 protobuf = "3.7"
 serde_json = "1.0"
 thiserror = "2.0"
-tokio = { version = "1.52.3", default-features = false, features = ["rt-multi-thread", "macros", "sync", "time"] }
+tokio = { version = "1.53.3", default-features = false, features = ["rt-multi-thread", "macros", "sync", "time"] }
 trait-variant = "0.1"
 
 [dev-dependencies]
 tempfile = "3.27"
-tokio = { version = "1.52.3", default-features = false, features = ["rt-multi-thread", "macros", "sync", "time", "signal"] }
+tokio = { version = "1.53.3", default-features = false, features = ["rt-multi-thread", "macros", "sync", "time", "signal"] }
 tokio-async-drop = "0.1"

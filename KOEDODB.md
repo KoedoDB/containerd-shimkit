@@ -56,3 +56,9 @@ checks `start` with the real binary.
 
 `[patch.crates-io]` a vendored copy of `containerd-shim` 0.11 without its `cgroup` module (the shim does not use it): drops
 `cgroups-rs` and `zbus` and about 35 crates. Not done.
+
+## Dependency versions
+
+The versions in `Cargo.toml` are those of the upstream workspace at `5a8fc8e9`, raised to the newest compatible ones
+on 2026-10-16 (`tokio` 1.53.3, `futures` 0.3.34; the rest are ranges that already take the newest). `oci-spec` stays on 0.9 on
+purpose: `containerd-shim` 0.11 (the newest) uses its types, and 0.10 would not unify with them.
