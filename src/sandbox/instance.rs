@@ -83,8 +83,14 @@ pub trait Instance: 'static {
     // The terminal of the task's own process. Optional: an instance that has no terminal leaves them as they are.
 
     /// Change the size of the task's terminal (`ResizePty` without an exec id).
-    fn resize_pty(&self, _width: u32, _height: u32) -> impl Future<Output = Result<(), Error>> + Send {
-        std::future::ready(Err(Error::FailedPrecondition("the task has no terminal".to_string())))
+    fn resize_pty(
+        &self,
+        _width: u32,
+        _height: u32,
+    ) -> impl Future<Output = Result<(), Error>> + Send {
+        std::future::ready(Err(Error::FailedPrecondition(
+            "the task has no terminal".to_string(),
+        )))
     }
 
     /// Close the standard input of the task's process (`CloseIO` without an exec id).
@@ -110,12 +116,19 @@ pub trait Instance: 'static {
     }
 
     /// Send a signal to a running exec process.
-    fn exec_kill(&self, _exec_id: &str, _signal: u32) -> impl Future<Output = Result<(), Error>> + Send {
+    fn exec_kill(
+        &self,
+        _exec_id: &str,
+        _signal: u32,
+    ) -> impl Future<Output = Result<(), Error>> + Send {
         std::future::ready(Err(exec_unimplemented()))
     }
 
     /// Wait for the exec process to exit and return its exit status.
-    fn exec_wait(&self, _exec_id: &str) -> impl Future<Output = Result<(u32, DateTime<Utc>), Error>> + Send {
+    fn exec_wait(
+        &self,
+        _exec_id: &str,
+    ) -> impl Future<Output = Result<(u32, DateTime<Utc>), Error>> + Send {
         std::future::ready(Err(exec_unimplemented()))
     }
 

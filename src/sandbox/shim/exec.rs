@@ -206,7 +206,10 @@ mod tests {
 
     #[test]
     fn exec_ids() {
-        assert!(check_exec_id("3e5e497c128db644d3b824ca51f7200a35d56ebbbcca7425392d608436fd3065").is_ok());
+        assert!(
+            check_exec_id("3e5e497c128db644d3b824ca51f7200a35d56ebbbcca7425392d608436fd3065")
+                .is_ok()
+        );
         assert!(check_exec_id("exec-1_a.b").is_ok());
         for bad in ["", "a/b", "..x/", "a b", "a\n", &"x".repeat(129)] {
             assert!(check_exec_id(bad).is_err(), "{bad:?}");

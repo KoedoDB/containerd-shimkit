@@ -42,7 +42,9 @@ impl<T: Instance> InstanceData<T> {
     /// The pid to show a client: the task's own once it runs, else the instance's hint (see `Instance::pid_hint`), else 0. Whether the task
     /// runs is told by `pid()`, never by this.
     pub fn reported_pid(&self) -> u32 {
-        self.pid().or_else(|| self.instance.pid_hint()).unwrap_or_default()
+        self.pid()
+            .or_else(|| self.instance.pid_hint())
+            .unwrap_or_default()
     }
 
     pub async fn start(&self) -> Result<u32> {
@@ -122,7 +124,12 @@ impl<T: Instance> InstanceData<T> {
     /// `Exec`: ask the instance to create the process, and keep it by its id. The task must be running.
     pub async fn exec_create(&self, config: ExecConfig) -> Result<()> {
         check_exec_id(&config.exec_id)?;
-        if self.pid().is_none() || matches!(*self.state.read().await, TaskState::Exited | TaskState::Deleting) {
+        if self.pid().is_none()
+            || matches!(
+                *self.state.read().await,
+                TaskState::Exited | TaskState::Deleting
+            )
+        {
             return Err(Error::FailedPrecondition(
                 "the task is not running, so it cannot have an exec process".into(),
             ));
@@ -130,7 +137,10 @@ impl<T: Instance> InstanceData<T> {
         // The lock is held through the instance's call, so two `Exec` with one id cannot both pass.
         let mut execs = self.execs.write().await;
         if execs.contains_key(&config.exec_id) {
-            return Err(Error::AlreadyExists(format!("exec process {}", config.exec_id)));
+            return Err(Error::AlreadyExists(format!(
+                "exec process {}",
+                config.exec_id
+            )));
         }
         if execs.len() >= MAX_EXECS {
             return Err(Error::FailedPrecondition(format!(
@@ -205,7 +215,9 @@ impl<T: Instance> InstanceData<T> {
             ));
         }
         if !exec.state.read().await.is_running() {
-            return Err(Error::FailedPrecondition("the exec process is not running".into()));
+            return Err(Error::FailedPrecondition(
+                "the exec process is not running".into(),
+            ));
         }
         self.instance
             .exec_resize(&exec.config.exec_id, width, height)
@@ -256,9 +268,15 @@ mod pid_hint_tests {
 
     #[tokio::test]
     async fn the_hint_is_shown_before_start_and_does_not_make_the_task_run() {
-        let data = InstanceData::<Hinted>::new("t", InstanceConfig::default()).await.unwrap();
+        let data = InstanceData::<Hinted>::new("t", InstanceConfig::default())
+            .await
+            .unwrap();
         assert_eq!(data.reported_pid(), 4242, "shown after Create");
-        assert_eq!(data.pid(), None, "but the task does not run yet: exec needs a running task");
+        assert_eq!(
+            data.pid(),
+            None,
+            "but the task does not run yet: exec needs a running task"
+        );
         data.start().await.unwrap();
         assert_eq!(data.pid(), Some(77));
         assert_eq!(data.reported_pid(), 77, "the task's own pid once it runs");
@@ -284,7 +302,9 @@ mod pid_hint_tests {
                 *self.0.wait().await
             }
         }
-        let data = InstanceData::<Plain>::new("t", InstanceConfig::default()).await.unwrap();
+        let data = InstanceData::<Plain>::new("t", InstanceConfig::default())
+            .await
+            .unwrap();
         assert_eq!(data.reported_pid(), 0);
     }
 }

@@ -531,16 +531,28 @@ impl Instance for ExecStub {
         *self.base_exit.wait().await
     }
     async fn resize_pty(&self, width: u32, height: u32) -> Result<(), Error> {
-        self.calls.lock().unwrap().push(format!("task resize {width}x{height}"));
+        self.calls
+            .lock()
+            .unwrap()
+            .push(format!("task resize {width}x{height}"));
         Ok(())
     }
     async fn close_stdin(&self) -> Result<(), Error> {
-        self.calls.lock().unwrap().push("task close_stdin".to_string());
+        self.calls
+            .lock()
+            .unwrap()
+            .push("task close_stdin".to_string());
         Ok(())
     }
     async fn exec_create(&self, cfg: &ExecConfig) -> Result<(), Error> {
-        self.calls.lock().unwrap().push(format!("create {} terminal={}", cfg.exec_id, cfg.terminal));
-        self.execs.lock().unwrap().insert(cfg.exec_id.clone(), WaitableCell::new());
+        self.calls
+            .lock()
+            .unwrap()
+            .push(format!("create {} terminal={}", cfg.exec_id, cfg.terminal));
+        self.execs
+            .lock()
+            .unwrap()
+            .insert(cfg.exec_id.clone(), WaitableCell::new());
         Ok(())
     }
     async fn exec_start(&self, exec_id: &str) -> Result<u32, Error> {
@@ -551,7 +563,10 @@ impl Instance for ExecStub {
         Ok(4242)
     }
     async fn exec_kill(&self, exec_id: &str, signal: u32) -> Result<(), Error> {
-        self.calls.lock().unwrap().push(format!("kill {exec_id} {signal}"));
+        self.calls
+            .lock()
+            .unwrap()
+            .push(format!("kill {exec_id} {signal}"));
         let cell = self.execs.lock().unwrap().get(exec_id).cloned();
         if let Some(c) = cell {
             let _ = c.set((128 + signal, Utc::now()));
@@ -571,11 +586,17 @@ impl Instance for ExecStub {
         Ok(())
     }
     async fn exec_resize(&self, exec_id: &str, width: u32, height: u32) -> Result<(), Error> {
-        self.calls.lock().unwrap().push(format!("resize {exec_id} {width}x{height}"));
+        self.calls
+            .lock()
+            .unwrap()
+            .push(format!("resize {exec_id} {width}x{height}"));
         Ok(())
     }
     async fn exec_close_stdin(&self, exec_id: &str) -> Result<(), Error> {
-        self.calls.lock().unwrap().push(format!("close_stdin {exec_id}"));
+        self.calls
+            .lock()
+            .unwrap()
+            .push(format!("close_stdin {exec_id}"));
         Ok(())
     }
 }
@@ -614,12 +635,17 @@ async fn running_task<I: Instance + Send + Sync>(
         })
         .await?;
     local
-        .task_start(StartRequest { id: id.to_string(), ..Default::default() })
+        .task_start(StartRequest {
+            id: id.to_string(),
+            ..Default::default()
+        })
         .await?;
     Ok((local, rx, dir))
 }
 
-fn topics(rx: &mut tokio::sync::mpsc::UnboundedReceiver<(String, Box<dyn MessageDyn>)>) -> Vec<String> {
+fn topics(
+    rx: &mut tokio::sync::mpsc::UnboundedReceiver<(String, Box<dyn MessageDyn>)>,
+) -> Vec<String> {
     let mut v = Vec::new();
     while let Ok((t, _)) = rx.try_recv() {
         v.push(t);
@@ -633,11 +659,20 @@ async fn exec_runs_from_create_to_delete() -> anyhow::Result<()> {
     let _ = topics(&mut rx);
 
     local
-        .task_exec(exec_request("t1", "e1", false, br#"{"args":["sh","-c","true"]}"#))
+        .task_exec(exec_request(
+            "t1",
+            "e1",
+            false,
+            br#"{"args":["sh","-c","true"]}"#,
+        ))
         .await?;
     assert_eq!(topics(&mut rx), vec!["/tasks/exec-added".to_string()]);
     let st = local
-        .task_state(StateRequest { id: "t1".into(), exec_id: "e1".into(), ..Default::default() })
+        .task_state(StateRequest {
+            id: "t1".into(),
+            exec_id: "e1".into(),
+            ..Default::default()
+        })
         .await?;
     assert_eq!(st.status(), Status::CREATED);
     assert_eq!(st.exec_id, "e1");
@@ -645,18 +680,30 @@ async fn exec_runs_from_create_to_delete() -> anyhow::Result<()> {
     // containerd waits before it starts the process
     let l2 = local.clone();
     let waiter = tokio::spawn(async move {
-        l2.task_wait(WaitRequest { id: "t1".into(), exec_id: "e1".into(), ..Default::default() })
-            .await
+        l2.task_wait(WaitRequest {
+            id: "t1".into(),
+            exec_id: "e1".into(),
+            ..Default::default()
+        })
+        .await
     });
 
     let pid = local
-        .task_start(StartRequest { id: "t1".into(), exec_id: "e1".into(), ..Default::default() })
+        .task_start(StartRequest {
+            id: "t1".into(),
+            exec_id: "e1".into(),
+            ..Default::default()
+        })
         .await?
         .pid;
     assert_eq!(pid, 4242);
     assert_eq!(topics(&mut rx), vec!["/tasks/exec-started".to_string()]);
     let st = local
-        .task_state(StateRequest { id: "t1".into(), exec_id: "e1".into(), ..Default::default() })
+        .task_state(StateRequest {
+            id: "t1".into(),
+            exec_id: "e1".into(),
+            ..Default::default()
+        })
         .await?;
     assert_eq!(st.status(), Status::RUNNING);
     assert_eq!(st.pid, 4242);
@@ -664,19 +711,32 @@ async fn exec_runs_from_create_to_delete() -> anyhow::Result<()> {
     // the process is running: it cannot be deleted, and starting it again is refused
     assert!(
         local
-            .task_delete(DeleteRequest { id: "t1".into(), exec_id: "e1".into(), ..Default::default() })
+            .task_delete(DeleteRequest {
+                id: "t1".into(),
+                exec_id: "e1".into(),
+                ..Default::default()
+            })
             .await
             .is_err()
     );
     assert!(
         local
-            .task_start(StartRequest { id: "t1".into(), exec_id: "e1".into(), ..Default::default() })
+            .task_start(StartRequest {
+                id: "t1".into(),
+                exec_id: "e1".into(),
+                ..Default::default()
+            })
             .await
             .is_err()
     );
 
     local
-        .task_kill(KillRequest { id: "t1".into(), exec_id: "e1".into(), signal: 9, ..Default::default() })
+        .task_kill(KillRequest {
+            id: "t1".into(),
+            exec_id: "e1".into(),
+            signal: 9,
+            ..Default::default()
+        })
         .await?;
     let w = tokio::time::timeout(Duration::from_secs(5), waiter).await???;
     assert_eq!(w.exit_status, 137);
@@ -694,23 +754,43 @@ async fn exec_runs_from_create_to_delete() -> anyhow::Result<()> {
 
     // a signal after the exit is accepted
     local
-        .task_kill(KillRequest { id: "t1".into(), exec_id: "e1".into(), signal: 15, ..Default::default() })
+        .task_kill(KillRequest {
+            id: "t1".into(),
+            exec_id: "e1".into(),
+            signal: 15,
+            ..Default::default()
+        })
         .await?;
 
     let st = local
-        .task_state(StateRequest { id: "t1".into(), exec_id: "e1".into(), ..Default::default() })
+        .task_state(StateRequest {
+            id: "t1".into(),
+            exec_id: "e1".into(),
+            ..Default::default()
+        })
         .await?;
     assert_eq!(st.status(), Status::STOPPED);
     assert_eq!(st.exit_status, 137);
 
     let del = local
-        .task_delete(DeleteRequest { id: "t1".into(), exec_id: "e1".into(), ..Default::default() })
+        .task_delete(DeleteRequest {
+            id: "t1".into(),
+            exec_id: "e1".into(),
+            ..Default::default()
+        })
         .await?;
     assert_eq!((del.pid, del.exit_status), (4242, 137));
-    assert!(topics(&mut rx).iter().all(|t| t != "/tasks/delete"), "no TaskDelete for an exec");
+    assert!(
+        topics(&mut rx).iter().all(|t| t != "/tasks/delete"),
+        "no TaskDelete for an exec"
+    );
     assert!(
         local
-            .task_state(StateRequest { id: "t1".into(), exec_id: "e1".into(), ..Default::default() })
+            .task_state(StateRequest {
+                id: "t1".into(),
+                exec_id: "e1".into(),
+                ..Default::default()
+            })
             .await
             .is_err(),
         "gone after delete"
@@ -718,7 +798,11 @@ async fn exec_runs_from_create_to_delete() -> anyhow::Result<()> {
 
     // the task itself still works
     local
-        .task_kill(KillRequest { id: "t1".into(), signal: 9, ..Default::default() })
+        .task_kill(KillRequest {
+            id: "t1".into(),
+            signal: 9,
+            ..Default::default()
+        })
         .await?;
     Ok(())
 }
@@ -727,7 +811,12 @@ async fn exec_runs_from_create_to_delete() -> anyhow::Result<()> {
 async fn exec_is_refused_in_the_wrong_circumstances() -> anyhow::Result<()> {
     // A task that is not running.
     let (tx, _rx) = channel();
-    let local = Arc::new(Local::<ExecStub, _>::new(tx, WaitableCell::new(), "ns", "/addr"));
+    let local = Arc::new(Local::<ExecStub, _>::new(
+        tx,
+        WaitableCell::new(),
+        "ns",
+        "/addr",
+    ));
     let dir = tempdir()?;
     create_bundle(dir.path(), None)?;
     local
@@ -738,28 +827,44 @@ async fn exec_is_refused_in_the_wrong_circumstances() -> anyhow::Result<()> {
         })
         .await?;
     assert!(matches!(
-        local.task_exec(exec_request("t2", "e1", false, b"{}")).await,
+        local
+            .task_exec(exec_request("t2", "e1", false, b"{}"))
+            .await,
         Err(Error::FailedPrecondition(_))
     ));
-    local.task_start(StartRequest { id: "t2".into(), ..Default::default() }).await?;
+    local
+        .task_start(StartRequest {
+            id: "t2".into(),
+            ..Default::default()
+        })
+        .await?;
 
     // no such task, a bad id, a spec that is not JSON, one that is not an object, one that is too large
     assert!(matches!(
-        local.task_exec(exec_request("nope", "e1", false, b"{}")).await,
+        local
+            .task_exec(exec_request("nope", "e1", false, b"{}"))
+            .await,
         Err(Error::NotFound(_))
     ));
     for bad in ["", "a/b", "x y"] {
-        assert!(matches!(
-            local.task_exec(exec_request("t2", bad, false, b"{}")).await,
-            Err(Error::InvalidArgument(_))
-        ), "{bad:?}");
+        assert!(
+            matches!(
+                local.task_exec(exec_request("t2", bad, false, b"{}")).await,
+                Err(Error::InvalidArgument(_))
+            ),
+            "{bad:?}"
+        );
     }
     assert!(matches!(
-        local.task_exec(exec_request("t2", "e1", false, b"not json")).await,
+        local
+            .task_exec(exec_request("t2", "e1", false, b"not json"))
+            .await,
         Err(Error::InvalidArgument(_))
     ));
     assert!(matches!(
-        local.task_exec(exec_request("t2", "e1", false, b"[1]")).await,
+        local
+            .task_exec(exec_request("t2", "e1", false, b"[1]"))
+            .await,
         Err(Error::InvalidArgument(_))
     ));
     let big = vec![b' '; MAX_EXEC_SPEC_BYTES + 1];
@@ -769,54 +874,92 @@ async fn exec_is_refused_in_the_wrong_circumstances() -> anyhow::Result<()> {
     ));
     let mut no_spec = exec_request("t2", "e1", false, b"{}");
     no_spec.spec = Default::default();
-    assert!(matches!(local.task_exec(no_spec).await, Err(Error::InvalidArgument(_))));
+    assert!(matches!(
+        local.task_exec(no_spec).await,
+        Err(Error::InvalidArgument(_))
+    ));
 
     // the same id twice
-    local.task_exec(exec_request("t2", "e1", false, b"{}")).await?;
+    local
+        .task_exec(exec_request("t2", "e1", false, b"{}"))
+        .await?;
     assert!(matches!(
-        local.task_exec(exec_request("t2", "e1", false, b"{}")).await,
+        local
+            .task_exec(exec_request("t2", "e1", false, b"{}"))
+            .await,
         Err(Error::AlreadyExists(_))
     ));
 
     // a signal to an exec that was not started; resize without a terminal
     assert!(
         local
-            .task_kill(KillRequest { id: "t2".into(), exec_id: "e1".into(), signal: 9, ..Default::default() })
+            .task_kill(KillRequest {
+                id: "t2".into(),
+                exec_id: "e1".into(),
+                signal: 9,
+                ..Default::default()
+            })
             .await
             .is_err()
     );
     assert!(
         local
-            .task_resize_pty(ResizePtyRequest { id: "t2".into(), exec_id: "e1".into(), width: 80, height: 24, ..Default::default() })
+            .task_resize_pty(ResizePtyRequest {
+                id: "t2".into(),
+                exec_id: "e1".into(),
+                width: 80,
+                height: 24,
+                ..Default::default()
+            })
             .await
             .is_err()
     );
     // the task has no terminal
     assert!(
         local
-            .task_resize_pty(ResizePtyRequest { id: "t2".into(), width: 80, height: 24, ..Default::default() })
+            .task_resize_pty(ResizePtyRequest {
+                id: "t2".into(),
+                width: 80,
+                height: 24,
+                ..Default::default()
+            })
             .await
             .is_err()
     );
     // an exec that was never started can be deleted
     local
-        .task_delete(DeleteRequest { id: "t2".into(), exec_id: "e1".into(), ..Default::default() })
+        .task_delete(DeleteRequest {
+            id: "t2".into(),
+            exec_id: "e1".into(),
+            ..Default::default()
+        })
         .await?;
     Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn a_start_that_fails_leaves_an_exec_that_is_stopped_and_can_be_deleted() -> anyhow::Result<()> {
+async fn a_start_that_fails_leaves_an_exec_that_is_stopped_and_can_be_deleted() -> anyhow::Result<()>
+{
     let (local, _rx, _dir) = running_task::<ExecStub>("t3").await?;
-    local.task_exec(exec_request("t3", "unstartable", false, b"{}")).await?;
+    local
+        .task_exec(exec_request("t3", "unstartable", false, b"{}"))
+        .await?;
     let l2 = local.clone();
     let waiter = tokio::spawn(async move {
-        l2.task_wait(WaitRequest { id: "t3".into(), exec_id: "unstartable".into(), ..Default::default() })
-            .await
+        l2.task_wait(WaitRequest {
+            id: "t3".into(),
+            exec_id: "unstartable".into(),
+            ..Default::default()
+        })
+        .await
     });
     assert!(
         local
-            .task_start(StartRequest { id: "t3".into(), exec_id: "unstartable".into(), ..Default::default() })
+            .task_start(StartRequest {
+                id: "t3".into(),
+                exec_id: "unstartable".into(),
+                ..Default::default()
+            })
             .await
             .is_err()
     );
@@ -824,11 +967,19 @@ async fn a_start_that_fails_leaves_an_exec_that_is_stopped_and_can_be_deleted() 
     let w = tokio::time::timeout(Duration::from_secs(5), waiter).await???;
     assert_eq!(w.exit_status, 255);
     let st = local
-        .task_state(StateRequest { id: "t3".into(), exec_id: "unstartable".into(), ..Default::default() })
+        .task_state(StateRequest {
+            id: "t3".into(),
+            exec_id: "unstartable".into(),
+            ..Default::default()
+        })
         .await?;
     assert_eq!(st.status(), Status::STOPPED);
     local
-        .task_delete(DeleteRequest { id: "t3".into(), exec_id: "unstartable".into(), ..Default::default() })
+        .task_delete(DeleteRequest {
+            id: "t3".into(),
+            exec_id: "unstartable".into(),
+            ..Default::default()
+        })
         .await?;
     Ok(())
 }
@@ -836,28 +987,59 @@ async fn a_start_that_fails_leaves_an_exec_that_is_stopped_and_can_be_deleted() 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn terminal_resize_and_close_io_reach_the_instance() -> anyhow::Result<()> {
     let (local, _rx, _dir) = running_task::<ExecStub>("t4").await?;
-    local.task_exec(exec_request("t4", "tty", true, b"{}")).await?;
     local
-        .task_start(StartRequest { id: "t4".into(), exec_id: "tty".into(), ..Default::default() })
+        .task_exec(exec_request("t4", "tty", true, b"{}"))
         .await?;
     local
-        .task_resize_pty(ResizePtyRequest { id: "t4".into(), exec_id: "tty".into(), width: 120, height: 40, ..Default::default() })
+        .task_start(StartRequest {
+            id: "t4".into(),
+            exec_id: "tty".into(),
+            ..Default::default()
+        })
         .await?;
     local
-        .task_close_io(CloseIORequest { id: "t4".into(), exec_id: "tty".into(), stdin: true, ..Default::default() })
+        .task_resize_pty(ResizePtyRequest {
+            id: "t4".into(),
+            exec_id: "tty".into(),
+            width: 120,
+            height: 40,
+            ..Default::default()
+        })
+        .await?;
+    local
+        .task_close_io(CloseIORequest {
+            id: "t4".into(),
+            exec_id: "tty".into(),
+            stdin: true,
+            ..Default::default()
+        })
         .await?;
     let i = local.get_instance("t4").await?;
     let calls = i.instance.calls.lock().unwrap().clone();
     assert_eq!(
         calls,
-        vec!["create tty terminal=true", "start tty", "resize tty 120x40", "close_stdin tty"]
+        vec![
+            "create tty terminal=true",
+            "start tty",
+            "resize tty 120x40",
+            "close_stdin tty"
+        ]
     );
     // CloseIO of the task itself is accepted and does nothing
     local
-        .task_close_io(CloseIORequest { id: "t4".into(), stdin: true, ..Default::default() })
+        .task_close_io(CloseIORequest {
+            id: "t4".into(),
+            stdin: true,
+            ..Default::default()
+        })
         .await?;
     local
-        .task_kill(KillRequest { id: "t4".into(), exec_id: "tty".into(), signal: 9, ..Default::default() })
+        .task_kill(KillRequest {
+            id: "t4".into(),
+            exec_id: "tty".into(),
+            signal: 9,
+            ..Default::default()
+        })
         .await?;
     Ok(())
 }
@@ -865,12 +1047,21 @@ async fn terminal_resize_and_close_io_reach_the_instance() -> anyhow::Result<()>
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn an_instance_without_exec_answers_unimplemented() -> anyhow::Result<()> {
     let (local, _rx, _dir) = running_task::<InstanceStub>("t5").await?;
-    let err = local.task_exec(exec_request("t5", "e1", false, b"{}")).await.unwrap_err();
+    let err = local
+        .task_exec(exec_request("t5", "e1", false, b"{}"))
+        .await
+        .unwrap_err();
     assert!(
         matches!(err, Error::Shim(containerd_shim::Error::Unimplemented(_))),
         "{err:?}"
     );
-    local.task_kill(KillRequest { id: "t5".into(), signal: 9, ..Default::default() }).await?;
+    local
+        .task_kill(KillRequest {
+            id: "t5".into(),
+            signal: 9,
+            ..Default::default()
+        })
+        .await?;
     Ok(())
 }
 
@@ -885,7 +1076,12 @@ async fn task_with_terminal(
     tempfile::TempDir,
 )> {
     let (tx, rx) = channel();
-    let local = Arc::new(Local::<ExecStub, _>::new(tx, WaitableCell::new(), "ns", "/addr"));
+    let local = Arc::new(Local::<ExecStub, _>::new(
+        tx,
+        WaitableCell::new(),
+        "ns",
+        "/addr",
+    ));
     let dir = tempdir()?;
     create_bundle(dir.path(), None)?;
     local
@@ -901,56 +1097,185 @@ async fn task_with_terminal(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn a_task_with_a_terminal_can_be_created_and_the_flag_reaches_the_instance() -> anyhow::Result<()> {
+async fn a_task_with_a_terminal_can_be_created_and_the_flag_reaches_the_instance()
+-> anyhow::Result<()> {
     let (local, _rx, _dir) = task_with_terminal("tt1", true).await?;
     let i = local.get_instance("tt1").await?;
     assert!(i.config.terminal);
-    let st = local.task_state(StateRequest { id: "tt1".into(), ..Default::default() }).await?;
+    let st = local
+        .task_state(StateRequest {
+            id: "tt1".into(),
+            ..Default::default()
+        })
+        .await?;
     assert!(st.terminal, "State says the task has a terminal");
     assert_eq!(st.status(), Status::CREATED);
 
     let (local2, _rx2, _dir2) = task_with_terminal("tt2", false).await?;
     assert!(!local2.get_instance("tt2").await?.config.terminal);
-    let st = local2.task_state(StateRequest { id: "tt2".into(), ..Default::default() }).await?;
+    let st = local2
+        .task_state(StateRequest {
+            id: "tt2".into(),
+            ..Default::default()
+        })
+        .await?;
     assert!(!st.terminal);
     Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn resize_and_close_io_of_the_task_itself_reach_the_instance_only_when_they_make_sense() -> anyhow::Result<()> {
+async fn resize_and_close_io_of_the_task_itself_reach_the_instance_only_when_they_make_sense()
+-> anyhow::Result<()> {
     let (local, _rx, _dir) = task_with_terminal("tt3", true).await?;
-    let resize = |w, h| ResizePtyRequest { id: "tt3".into(), width: w, height: h, ..Default::default() };
-    let close = || CloseIORequest { id: "tt3".into(), stdin: true, ..Default::default() };
+    let resize = |w, h| ResizePtyRequest {
+        id: "tt3".into(),
+        width: w,
+        height: h,
+        ..Default::default()
+    };
+    let close = || CloseIORequest {
+        id: "tt3".into(),
+        stdin: true,
+        ..Default::default()
+    };
 
     // Not started: a resize is refused, a close does nothing.
     assert!(local.task_resize_pty(resize(80, 24)).await.is_err());
     local.task_close_io(close()).await?;
 
-    local.task_start(StartRequest { id: "tt3".into(), ..Default::default() }).await?;
+    local
+        .task_start(StartRequest {
+            id: "tt3".into(),
+            ..Default::default()
+        })
+        .await?;
     local.task_resize_pty(resize(120, 40)).await?;
     local.task_close_io(close()).await?;
     // CloseIO that is not about stdin does nothing.
-    local.task_close_io(CloseIORequest { id: "tt3".into(), stdin: false, ..Default::default() }).await?;
+    local
+        .task_close_io(CloseIORequest {
+            id: "tt3".into(),
+            stdin: false,
+            ..Default::default()
+        })
+        .await?;
     let i = local.get_instance("tt3").await?;
-    assert_eq!(i.instance.calls.lock().unwrap().clone(), vec!["task resize 120x40", "task close_stdin"]);
+    assert_eq!(
+        i.instance.calls.lock().unwrap().clone(),
+        vec!["task resize 120x40", "task close_stdin"]
+    );
 
     // No such task.
     assert!(matches!(
-        local.task_resize_pty(ResizePtyRequest { id: "nope".into(), width: 1, height: 1, ..Default::default() }).await,
+        local
+            .task_resize_pty(ResizePtyRequest {
+                id: "nope".into(),
+                width: 1,
+                height: 1,
+                ..Default::default()
+            })
+            .await,
         Err(Error::NotFound(_))
     ));
 
     // A task without a terminal has nothing to resize.
     let (plain, _rx2, _dir2) = task_with_terminal("tt4", false).await?;
-    plain.task_start(StartRequest { id: "tt4".into(), ..Default::default() }).await?;
+    plain
+        .task_start(StartRequest {
+            id: "tt4".into(),
+            ..Default::default()
+        })
+        .await?;
     assert!(
         plain
-            .task_resize_pty(ResizePtyRequest { id: "tt4".into(), width: 80, height: 24, ..Default::default() })
+            .task_resize_pty(ResizePtyRequest {
+                id: "tt4".into(),
+                width: 80,
+                height: 24,
+                ..Default::default()
+            })
             .await
             .is_err()
     );
 
-    local.task_kill(KillRequest { id: "tt3".into(), signal: 9, ..Default::default() }).await?;
-    plain.task_kill(KillRequest { id: "tt4".into(), signal: 9, ..Default::default() }).await?;
+    local
+        .task_kill(KillRequest {
+            id: "tt3".into(),
+            signal: 9,
+            ..Default::default()
+        })
+        .await?;
+    plain
+        .task_kill(KillRequest {
+            id: "tt4".into(),
+            signal: 9,
+            ..Default::default()
+        })
+        .await?;
+    Ok(())
+}
+
+/// containerd asks for the processes of every shim when it starts again, and deletes a shim that is not a sandbox's and has none (it takes it for a
+/// leak); the task is then gone from containerd while the container still runs. NOT_FOUND (the trait's own answer) is read as "none".
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+async fn test_pids_lists_the_task_so_that_containerd_does_not_take_it_for_a_leak() -> Result<()> {
+    let (etx, _erx) = channel();
+    let exit_signal = WaitableCell::new();
+    let local = Arc::new(Local::<InstanceStub, _>::new(
+        etx,
+        exit_signal,
+        "test_namespace",
+        "/test/address",
+    ));
+    let mut _wrapped = LocalWithDestructor::new(local.clone());
+
+    // no such task: NotFound
+    match local
+        .task_pids(PidsRequest {
+            id: "test".to_string(),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err()
+    {
+        Error::NotFound(_) => {}
+        e => return Err(e),
+    }
+
+    let temp = tempdir().unwrap();
+    let dir = temp.path();
+    create_bundle(dir, None)?;
+    local
+        .task_create(CreateTaskRequest {
+            id: "test".to_string(),
+            bundle: dir.to_str().unwrap().to_string(),
+            ..Default::default()
+        })
+        .await?;
+
+    // created, not started: still one process (the shim's own pid is shown)
+    let r = local
+        .task_pids(PidsRequest {
+            id: "test".to_string(),
+            ..Default::default()
+        })
+        .await?;
+    assert_eq!(r.processes.len(), 1);
+    assert_ne!(r.processes[0].pid, 0);
+
+    local
+        .task_start(StartRequest {
+            id: "test".to_string(),
+            ..Default::default()
+        })
+        .await?;
+    let r = local
+        .task_pids(PidsRequest {
+            id: "test".to_string(),
+            ..Default::default()
+        })
+        .await?;
+    assert_eq!(r.processes.len(), 1, "a running task has a process");
+    assert_ne!(r.processes[0].pid, 0);
     Ok(())
 }

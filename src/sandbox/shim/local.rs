@@ -4,24 +4,6 @@ use std::ops::Not;
 use std::path::Path;
 use std::sync::Arc;
 
-use containerd_shim::api::{
-    CloseIORequest, ConnectRequest, ConnectResponse, CreateTaskRequest, CreateTaskResponse,
-    DeleteRequest, Empty, ExecProcessRequest, KillRequest, ResizePtyRequest, ShutdownRequest,
-    StartRequest, StartResponse, StateRequest, StateResponse, StatsRequest, StatsResponse,
-    WaitRequest, WaitResponse,
-};
-use containerd_shim::error::Error as ShimError;
-use containerd_shim::protos::events::task::{
-    TaskCreate, TaskDelete, TaskExecAdded, TaskExecStarted, TaskExit, TaskIO, TaskStart,
-};
-use containerd_shim::protos::shim::shim_ttrpc::Task;
-use containerd_shim::protos::types::task::Status;
-use containerd_shim::util::IntoOption;
-use containerd_shim::{DeleteResponse, TtrpcContext, TtrpcResult};
-use futures::FutureExt as _;
-use log::debug;
-use oci_spec::runtime::Spec;
-use tokio::sync::RwLock;
 use crate::sandbox::async_utils::AmbientRuntime as _;
 use crate::sandbox::instance::{ExecConfig, Instance, InstanceConfig};
 use crate::sandbox::shim::events::{EventSender, RemoteEventSender, ToTimestamp};
@@ -30,6 +12,24 @@ use crate::sandbox::shim::instance_data::InstanceData;
 use crate::sandbox::sync::WaitableCell;
 use crate::sandbox::{Error, Result};
 use crate::sys::metrics::get_metrics;
+use containerd_shim::api::{
+    CloseIORequest, ConnectRequest, ConnectResponse, CreateTaskRequest, CreateTaskResponse,
+    DeleteRequest, Empty, ExecProcessRequest, KillRequest, PidsRequest, PidsResponse,
+    ResizePtyRequest, ShutdownRequest, StartRequest, StartResponse, StateRequest, StateResponse,
+    StatsRequest, StatsResponse, WaitRequest, WaitResponse,
+};
+use containerd_shim::error::Error as ShimError;
+use containerd_shim::protos::events::task::{
+    TaskCreate, TaskDelete, TaskExecAdded, TaskExecStarted, TaskExit, TaskIO, TaskStart,
+};
+use containerd_shim::protos::shim::shim_ttrpc::Task;
+use containerd_shim::protos::types::task::{ProcessInfo, Status};
+use containerd_shim::util::IntoOption;
+use containerd_shim::{DeleteResponse, TtrpcContext, TtrpcResult};
+use futures::FutureExt as _;
+use log::debug;
+use oci_spec::runtime::Spec;
+use tokio::sync::RwLock;
 
 #[cfg(test)]
 mod tests;
@@ -281,6 +281,21 @@ impl<T: Instance + Send + Sync, E: EventSender> Local<T, E> {
         })
     }
 
+    /// The processes of a task (see `Task::pids`): one entry, the task's pid, or the shim's own while the task has none yet.
+    async fn task_pids(&self, req: PidsRequest) -> Result<PidsResponse> {
+        let i = self.get_instance(req.id()).await?;
+        let pid = match i.reported_pid() {
+            0 => std::process::id(),
+            p => p,
+        };
+        let mut res = PidsResponse::new();
+        res.processes.push(ProcessInfo {
+            pid,
+            ..Default::default()
+        });
+        Ok(res)
+    }
+
     async fn task_state(&self, req: StateRequest) -> Result<StateResponse> {
         if !req.exec_id().is_empty() {
             let i = self.get_instance(req.id()).await?;
@@ -344,12 +359,17 @@ impl<T: Instance + Send + Sync, E: EventSender> Local<T, E> {
             .ok_or_else(|| Error::InvalidArgument("the exec request has no process spec".into()))?;
         // The body of the `Any` is the OCI `Process` as JSON. It is checked to be that before an instance sees it.
         if spec.value.len() > MAX_EXEC_SPEC_BYTES {
-            return Err(Error::InvalidArgument("the exec process spec is too large".into()));
+            return Err(Error::InvalidArgument(
+                "the exec process spec is too large".into(),
+            ));
         }
-        let process: serde_json::Value = serde_json::from_slice(&spec.value)
-            .map_err(|e| Error::InvalidArgument(format!("the exec process spec is not JSON: {e}")))?;
+        let process: serde_json::Value = serde_json::from_slice(&spec.value).map_err(|e| {
+            Error::InvalidArgument(format!("the exec process spec is not JSON: {e}"))
+        })?;
         if !process.is_object() {
-            return Err(Error::InvalidArgument("the exec process spec is not an object".into()));
+            return Err(Error::InvalidArgument(
+                "the exec process spec is not an object".into(),
+            ));
         }
         let config = ExecConfig {
             exec_id: req.exec_id().to_string(),
@@ -451,13 +471,11 @@ impl<T: Instance + Sync + Send, E: EventSender> Task for Local<T, E> {
     ) -> TtrpcResult<CreateTaskResponse> {
         debug!("create: {:?}", req);
 
-
         Ok(self.task_create(req).block_on()?)
     }
 
     fn start(&self, _ctx: &TtrpcContext, req: StartRequest) -> TtrpcResult<StartResponse> {
         debug!("start: {:?}", req);
-
 
         Ok(self.task_start(req).block_on()?)
     }
@@ -465,13 +483,11 @@ impl<T: Instance + Sync + Send, E: EventSender> Task for Local<T, E> {
     fn kill(&self, _ctx: &TtrpcContext, req: KillRequest) -> TtrpcResult<Empty> {
         debug!("kill: {:?}", req);
 
-
         Ok(self.task_kill(req).block_on()?)
     }
 
     fn delete(&self, _ctx: &TtrpcContext, req: DeleteRequest) -> TtrpcResult<DeleteResponse> {
         debug!("delete: {:?}", req);
-
 
         Ok(self.task_delete(req).block_on()?)
     }
@@ -487,13 +503,11 @@ impl<T: Instance + Sync + Send, E: EventSender> Task for Local<T, E> {
     fn exec(&self, _ctx: &TtrpcContext, req: ExecProcessRequest) -> TtrpcResult<Empty> {
         debug!("exec: {:?}", req);
 
-
         Ok(self.task_exec(req).block_on()?)
     }
 
     fn resize_pty(&self, _ctx: &TtrpcContext, req: ResizePtyRequest) -> TtrpcResult<Empty> {
         debug!("resize_pty: {:?}", req);
-
 
         Ok(self.task_resize_pty(req).block_on()?)
     }
@@ -501,13 +515,11 @@ impl<T: Instance + Sync + Send, E: EventSender> Task for Local<T, E> {
     fn close_io(&self, _ctx: &TtrpcContext, req: CloseIORequest) -> TtrpcResult<Empty> {
         debug!("close_io: {:?}", req);
 
-
         Ok(self.task_close_io(req).block_on()?)
     }
 
     fn connect(&self, _ctx: &TtrpcContext, req: ConnectRequest) -> TtrpcResult<ConnectResponse> {
         debug!("connect: {:?}", req);
-
 
         let i = self.get_instance(req.id()).block_on()?;
         let shim_pid = std::process::id();
@@ -519,16 +531,24 @@ impl<T: Instance + Sync + Send, E: EventSender> Task for Local<T, E> {
         })
     }
 
+    /// The processes of a task. containerd asks when it starts again: a shim that is not a sandbox's, and whose task has no process, is taken for one
+    /// that leaked, and it is deleted (the task is gone from containerd, the kubelet starts the container again, in the same VM, while the old
+    /// one still runs). The trait's own answer is NOT_FOUND, which is read as "no process". One entry, the task's pid: the processes inside a
+    /// guest are not the host's to list.
+    fn pids(&self, _ctx: &TtrpcContext, req: PidsRequest) -> TtrpcResult<PidsResponse> {
+        debug!("pids: {:?}", req);
+
+        Ok(self.task_pids(req).block_on()?)
+    }
+
     fn state(&self, _ctx: &TtrpcContext, req: StateRequest) -> TtrpcResult<StateResponse> {
         debug!("state: {:?}", req);
-
 
         Ok(self.task_state(req).block_on()?)
     }
 
     fn shutdown(&self, _ctx: &TtrpcContext, _: ShutdownRequest) -> TtrpcResult<Empty> {
         debug!("shutdown");
-
 
         if self.is_empty().block_on() {
             let _ = self.exit.set(());
@@ -538,7 +558,6 @@ impl<T: Instance + Sync + Send, E: EventSender> Task for Local<T, E> {
 
     fn stats(&self, _ctx: &TtrpcContext, req: StatsRequest) -> TtrpcResult<StatsResponse> {
         debug!("stats: {:?}", req);
-
 
         Ok(self.task_stats(req).block_on()?)
     }
